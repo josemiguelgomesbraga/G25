@@ -1,0 +1,425 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.25.0",
+    "script_metadata_hash": "aa99b824926f8ba09bc529ece311fae1"
+  },
+  "cells": [
+    {
+      "id": "setup",
+      "code_hash": "6f32672e0e68c7978d01f66f0ef5df85",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Hbol",
+      "code_hash": "e4ac10d6af5ec73e2742ecd0dadd1192",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"tp3-exercicio-1-exclusao-mutua-num-anel-com-testemunho\">TP3 \u2014 Exerc\u00edcio 1: exclus\u00e3o m\u00fatua num anel com testemunho</h1>\n<span class=\"paragraph\"><strong>Grupo 25.</strong></span>\n<h2 id=\"o-problema-e-a-abordagem\">O problema e a abordagem</h2>\n<span class=\"paragraph\"><marimo-tex class=\"arithmatex\">||(N||)</marimo-tex> processos em anel; cada processo <marimo-tex class=\"arithmatex\">||(i||)</marimo-tex> tem tr\u00eas booleanos: <marimo-tex class=\"arithmatex\">||(w_i||)</marimo-tex> (\u00e0 espera),\n<marimo-tex class=\"arithmatex\">||(c_i||)</marimo-tex> (na sec\u00e7\u00e3o cr\u00edtica) e <marimo-tex class=\"arithmatex\">||(t_i||)</marimo-tex> (tem o testemunho). S\u00f3 o processo <marimo-tex class=\"arithmatex\">||(0||)</marimo-tex> come\u00e7a\ncom o testemunho, e as regras <em>pedir</em>, <em>entrar</em>, <em>sair</em> e <em>passar</em> movem um \u00fanico\nprocesso de cada vez. O estado de erro \u00e9 \"dois processos na sec\u00e7\u00e3o cr\u00edtica\".</span>\n<span class=\"paragraph\">Plano do notebook (segue as al\u00edneas do enunciado):</span>\n<ol>\n<li><strong>SFOTS em Z3</strong>, parametrizado por <marimo-tex class=\"arithmatex\">||(N||)</marimo-tex> (classe <code>Anel</code>).</li>\n<li><strong><marimo-tex class=\"arithmatex\">||(k||)</marimo-tex>-indu\u00e7\u00e3o</strong>: falha para <marimo-tex class=\"arithmatex\">||(k||)</marimo-tex> pequeno, com um contra-exemplo inalcan\u00e7\u00e1vel.</li>\n<li><strong>PDR</strong> (<code>pdr_lia.py</code>, sem o reimplementar) e <strong>interpolantes e invariantes</strong>\n   (<code>itp_mc</code>, com interpolantes calculados por CHCs/Spacer); o invariante\n   obtido \u00e9 verificado de forma independente (<code>e_invariante</code>).</li>\n<li><strong>Variante com regenera\u00e7\u00e3o</strong> do testemunho: insegura, com tra\u00e7o de erro por <strong>BMC</strong>.</li>\n<li><strong>Compara\u00e7\u00e3o</strong> para <marimo-tex class=\"arithmatex\">||(N||)</marimo-tex> crescente: PDR, interpolantes e Spacer.</li>\n</ol>\n<span class=\"paragraph\">Como refer\u00eancia independente usa-se uma <strong>pesquisa em largura</strong> sobre os estados\nalcan\u00e7\u00e1veis, escrita em Python puro.</span>\n<span class=\"paragraph\"><strong>Ferramentas LLM.</strong> Parte do c\u00f3digo deste notebook foi escrita em di\u00e1logo com\num assistente LLM (Claude). O c\u00f3digo foi revisto e testado pelo grupo.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "7fe3e07d852f324ca8cd80068f31cc17",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "9cf73b915fea352307462b74f94d6f73",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"o-que-foi-feito-alinea-1\">O que foi feito (al\u00ednea 1)</h3>\n<ul>\n<li><strong><code>Anel</code></strong> \u00e9 o SFOTS <marimo-tex class=\"arithmatex\">||(\\Sigma=\\langle \\mathsf{X},\\mathsf{I},\\mathsf{T},\\mathsf{E}\\rangle||)</marimo-tex>.\n  Um estado \u00e9 um dicion\u00e1rio com tr\u00eas listas de <marimo-tex class=\"arithmatex\">||(N||)</marimo-tex> booleanos Z3 (<code>w</code>, <code>c</code>, <code>t</code>).</li>\n<li><code>I</code>, <code>E</code> e <code>T</code> <strong>recebem o estado como argumento</strong>. Assim servem para qualquer\n  c\u00f3pia das vari\u00e1veis (<marimo-tex class=\"arithmatex\">||(\\mathsf{X}_0,\\dots,\\mathsf{X}_k||)</marimo-tex>), que o BMC, a <marimo-tex class=\"arithmatex\">||(k||)</marimo-tex>-indu\u00e7\u00e3o\n  e os interpolantes precisam.</li>\n<li><code>regras(X, X')</code> devolve uma f\u00f3rmula por (regra, processo). Cada regra diz s\u00f3 o que\n  muda; <strong>todas as outras vari\u00e1veis ficam iguais</strong> (condi\u00e7\u00e3o de frame). <code>T</code> \u00e9 a\n  disjun\u00e7\u00e3o de todas, por isso move-se um \u00fanico processo de cada vez.</li>\n<li>Com <code>regenera=True</code> acrescenta-se a regra <em>regenerar</em>.</li>\n<li>Com <code>inteiro=True</code> os booleanos passam a inteiros em <marimo-tex class=\"arithmatex\">||(\\{0,1\\}||)</marimo-tex>. \u00c9 a tradu\u00e7\u00e3o usada mais\n  \u00e0 frente para o PDR de <code>pdr_lia.py</code>, que s\u00f3 aceita <code>Int</code>.</li>\n<li><code>copias</code>, <code>mostra</code>, <code>inst</code> e <code>tamanho</code> s\u00e3o auxiliares: criar c\u00f3pias de vari\u00e1veis,\n  mostrar um estado (<code>W</code>, <code>C</code>, <code>T</code>), instanciar uma f\u00f3rmula noutro estado e medir a\n  dimens\u00e3o de uma f\u00f3rmula.</li>\n</ul></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "c89d38829224b284f5882710bbe67737",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lEQa",
+      "code_hash": "a976739c0f00c41ed66a986368c2712b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"o-que-foi-feito-alinea-2-parte-1\">O que foi feito (al\u00ednea 2, parte 1)</h3>\n<span class=\"paragraph\"><code>k_inducao(S, k)</code> faz os dois testes da <marimo-tex class=\"arithmatex\">||(k||)</marimo-tex>-indu\u00e7\u00e3o para a propriedade <marimo-tex class=\"arithmatex\">||(\\neg\\mathsf{E}||)</marimo-tex>:</span>\n<ul>\n<li><strong>Caso base</strong>: a partir de <marimo-tex class=\"arithmatex\">||(\\mathsf{I}||)</marimo-tex>, ao longo de <marimo-tex class=\"arithmatex\">||(k||)</marimo-tex> estados, nunca se chega a <marimo-tex class=\"arithmatex\">||(\\mathsf{E}||)</marimo-tex>.</li>\n<li><strong>Passo indutivo</strong>: se <marimo-tex class=\"arithmatex\">||(k||)</marimo-tex> estados consecutivos n\u00e3o s\u00e3o de erro, o seguinte tamb\u00e9m\n  n\u00e3o \u00e9. O estado inicial <em>n\u00e3o</em> entra aqui, e \u00e9 essa a fraqueza do m\u00e9todo.</li>\n</ul>\n<span class=\"paragraph\">Quando o passo falha, devolve o <strong>contra-exemplo</strong> (os <marimo-tex class=\"arithmatex\">||(k+1||)</marimo-tex> estados do modelo do Z3).\nO par\u00e2metro opcional <code>inv</code> refor\u00e7a a propriedade com um invariante (usado no b\u00f3nus).</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "PKri",
+      "code_hash": "f3165b5f7340a6897c4cd29f6942943e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Xref",
+      "code_hash": "ce0eff73f558e54e86e651aa114a354f",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"o-que-foi-feito-referencia-independente\">O que foi feito (refer\u00eancia independente)</h3>\n<ul>\n<li><code>sucessores</code> reescreve as regras <strong>em Python puro</strong>, sem Z3.</li>\n<li><code>referencia(N)</code> \u00e9 uma pesquisa em largura sobre todos os estados alcan\u00e7\u00e1veis:\n  diz se o sistema \u00e9 seguro, quantos estados s\u00e3o alcan\u00e7\u00e1veis e qual o tra\u00e7o de erro\n  mais curto. \u00c9 a \"verdade\" contra a qual se comparam o BMC, o PDR e os interpolantes.</li>\n<li><code>alcancavel(N, estado)</code> diz se um estado concreto \u00e9 alcan\u00e7\u00e1vel. Serve para\n  explicar o contra-exemplo da <marimo-tex class=\"arithmatex\">||(k||)</marimo-tex>-indu\u00e7\u00e3o.</li>\n</ul></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "4e7a619ef7d77cab677c952967db9acd",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><div class=\"language-text codehilite\"><pre><span></span><code>k=1:  base=True   passo=False\n    X0: p0:...  p1:.C.  p2:W.T    alcan\u00e7\u00e1vel a partir de I? False\n    X1: p0:...  p1:.C.  p2:.CT    alcan\u00e7\u00e1vel a partir de I? False\nk=2:  base=True   passo=False\n    X0: p0:W.T  p1:W.T  p2:...    alcan\u00e7\u00e1vel a partir de I? False\n    X1: p0:.CT  p1:W.T  p2:...    alcan\u00e7\u00e1vel a partir de I? False\n    X2: p0:.CT  p1:.CT  p2:...    alcan\u00e7\u00e1vel a partir de I? False\nk=3:  base=True   passo=False\n    X0: p0:...  p1:.C.  p2:..T    alcan\u00e7\u00e1vel a partir de I? False\n    X1: p0:...  p1:.C.  p2:W.T    alcan\u00e7\u00e1vel a partir de I? False\n    X2: p0:W..  p1:.C.  p2:W.T    alcan\u00e7\u00e1vel a partir de I? False\n    X3: p0:W..  p1:.C.  p2:.CT    alcan\u00e7\u00e1vel a partir de I? False\nk=4:  base=True   passo=False\n    X0: p0:..T  p1:...  p2:W.T    alcan\u00e7\u00e1vel a partir de I? False\n    X1: p0:..T  p1:W..  p2:W.T    alcan\u00e7\u00e1vel a partir de I? False\n    X2: p0:...  p1:W.T  p2:W.T    alcan\u00e7\u00e1vel a partir de I? False\n    X3: p0:...  p1:.CT  p2:W.T    alcan\u00e7\u00e1vel a partir de I? False\n    X4: p0:...  p1:.CT  p2:.CT    alcan\u00e7\u00e1vel a partir de I? False\n</code></pre></div></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "BYtC",
+      "code_hash": "b4824063bba246dd9ebb9cfdf828767c",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"o-que-foi-feito-e-o-que-se-observa-alinea-2-parte-2\">O que foi feito e o que se observa (al\u00ednea 2, parte 2)</h3>\n<span class=\"paragraph\">Para <marimo-tex class=\"arithmatex\">||(N=3||)</marimo-tex> corre-se a <marimo-tex class=\"arithmatex\">||(k||)</marimo-tex>-indu\u00e7\u00e3o com <marimo-tex class=\"arithmatex\">||(k=1,\\dots,4||)</marimo-tex> e, quando o passo falha, mostra-se o\ncontra-exemplo (<code>W</code>=espera, <code>C</code>=sec\u00e7\u00e3o cr\u00edtica, <code>T</code>=testemunho) e se cada estado \u00e9\nalcan\u00e7\u00e1vel.</span>\n<span class=\"paragraph\"><strong>Porque falha e porque o contra-exemplo n\u00e3o \u00e9 acess\u00edvel.</strong> O primeiro estado de cada\ncontra-exemplo (<marimo-tex class=\"arithmatex\">||(\\mathsf{X}_0||)</marimo-tex>) \u00e9 de um destes dois tipos: tem <strong>dois testemunhos</strong> (por\nexemplo <code>p0:W.T</code> e <code>p1:W.T</code>), ou tem um processo na sec\u00e7\u00e3o cr\u00edtica <strong>sem testemunho</strong>\n(por exemplo <code>p1:.C.</code>). A partir dele, as regras <em>entrar</em> e <em>sair</em> levam a dois processos\nem <code>C</code>. Mas estes estados n\u00e3o s\u00e3o alcan\u00e7\u00e1veis (a coluna \"alcan\u00e7\u00e1vel?\" d\u00e1 <code>False</code>): as\nregras nunca criam testemunhos, s\u00f3 os movem, o estado inicial tem exatamente um, e s\u00f3\nentra em <code>C</code> quem o tem. A <marimo-tex class=\"arithmatex\">||(k||)</marimo-tex>-indu\u00e7\u00e3o n\u00e3o \"sabe\" isto, porque o passo indutivo parte de\nestados arbitr\u00e1rios. Para valores pequenos de <marimo-tex class=\"arithmatex\">||(k||)</marimo-tex> h\u00e1 sempre um contra-exemplo deste tipo,\ne s\u00f3 um invariante que diga \"h\u00e1 exatamente um testemunho e quem est\u00e1 em <code>C</code> tem-no\" os\nelimina.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "RGSE",
+      "code_hash": "7cf26ab59e547a14dd00372769f8e6d2",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Kclp",
+      "code_hash": "7f76096957704ca2ff31ea3d25014537",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"o-que-foi-feito-alinea-4-bmc\">O que foi feito (al\u00ednea 4, BMC)</h3>\n<ul>\n<li><code>bmc(S, K)</code> procura, para <marimo-tex class=\"arithmatex\">||(n=0,1,\\dots,K||)</marimo-tex>, um tra\u00e7o <marimo-tex class=\"arithmatex\">||(\\mathsf{X}_0\\to\\dots\\to\\mathsf{X}_n||)</marimo-tex>\n  com <marimo-tex class=\"arithmatex\">||(\\mathsf{I}(\\mathsf{X}_0)||)</marimo-tex>, <marimo-tex class=\"arithmatex\">||(\\mathsf{T}||)</marimo-tex> em cada passo e <marimo-tex class=\"arithmatex\">||(\\mathsf{E}(\\mathsf{X}_n)||)</marimo-tex>. Como <marimo-tex class=\"arithmatex\">||(n||)</marimo-tex> cresce, o\n  primeiro que encontra \u00e9 <strong>o mais curto</strong>. Devolve <code>None</code> se n\u00e3o houver at\u00e9 <marimo-tex class=\"arithmatex\">||(K||)</marimo-tex>.</li>\n<li>Para cada passo, descobre <strong>qual a regra e qual o processo</strong> que se moveram,\n  avaliando no modelo a f\u00f3rmula de cada regra.</li>\n<li><code>e_traco</code> valida o tra\u00e7o por conta pr\u00f3pria: come\u00e7a em <marimo-tex class=\"arithmatex\">||(\\mathsf{I}||)</marimo-tex>, cada passo satisfaz <marimo-tex class=\"arithmatex\">||(\\mathsf{T}||)</marimo-tex>\n  e acaba em <marimo-tex class=\"arithmatex\">||(\\mathsf{E}||)</marimo-tex> (avaliando com valores concretos).</li>\n</ul></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "emfo",
+      "code_hash": "4de48f6d9b145261079a722abbc20e5b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Hstk",
+      "code_hash": "8039abdb80de922de94b6b4bc01207fe",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"o-que-foi-feito-verificacao-independente-de-invariantes\">O que foi feito (verifica\u00e7\u00e3o independente de invariantes)</h3>\n<span class=\"paragraph\"><code>e_invariante(S, inv)</code> recebe um invariante como fun\u00e7\u00e3o <code>inv(S, X)</code> e faz os <strong>tr\u00eas\ntestes de insatisfazibilidade</strong> do enunciado:</span>\n<ol>\n<li><marimo-tex class=\"arithmatex\">||(\\mathsf{I}\\land\\neg\\mathsf{inv}||)</marimo-tex>: o invariante cont\u00e9m os estados iniciais;</li>\n<li><marimo-tex class=\"arithmatex\">||(\\mathsf{inv}\\land\\mathsf{T}\\land\\neg\\mathsf{inv}'||)</marimo-tex>: \u00e9 indutivo (um passo mant\u00e9m-no);</li>\n<li><marimo-tex class=\"arithmatex\">||(\\mathsf{inv}\\land\\mathsf{E}||)</marimo-tex>: exclui os estados de erro.</li>\n</ol>\n<span class=\"paragraph\">N\u00e3o usa PDR nem interpolantes, por isso serve para confirmar o que eles devolvem.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "nWHF",
+      "code_hash": "1a7dfcd9ee7bee50644cb1024e7c7c9c",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\"><strong>BMC contra a pesquisa em largura</strong> (as asser\u00e7\u00f5es passaram):</span>\n<div class=\"language-verilog codehilite\"><pre><span></span><code><span class=\"n\">N</span><span class=\"o\">=</span><span class=\"mh\">2</span><span class=\"w\"> </span><span class=\"n\">regenera</span><span class=\"o\">=</span><span class=\"nl\">False:</span><span class=\"w\"> </span><span class=\"n\">seguro</span><span class=\"w\">     </span><span class=\"mh\">12</span><span class=\"w\"> </span><span class=\"n\">estados</span><span class=\"w\"> </span><span class=\"n\">alcan\u00e7\u00e1veis</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">tra\u00e7o</span><span class=\"w\"> </span><span class=\"n\">de</span><span class=\"w\"> </span><span class=\"n\">erro</span><span class=\"w\"> </span><span class=\"n\">mais</span><span class=\"w\"> </span><span class=\"nl\">curto:</span><span class=\"w\"> </span><span class=\"n\">None</span>\n<span class=\"n\">N</span><span class=\"o\">=</span><span class=\"mh\">2</span><span class=\"w\"> </span><span class=\"n\">regenera</span><span class=\"o\">=</span><span class=\"n\">True</span><span class=\"w\"> </span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">INSEGURO</span><span class=\"w\">   </span><span class=\"mh\">20</span><span class=\"w\"> </span><span class=\"n\">estados</span><span class=\"w\"> </span><span class=\"n\">alcan\u00e7\u00e1veis</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">tra\u00e7o</span><span class=\"w\"> </span><span class=\"n\">de</span><span class=\"w\"> </span><span class=\"n\">erro</span><span class=\"w\"> </span><span class=\"n\">mais</span><span class=\"w\"> </span><span class=\"nl\">curto:</span><span class=\"w\"> </span><span class=\"mh\">5</span>\n<span class=\"n\">N</span><span class=\"o\">=</span><span class=\"mh\">3</span><span class=\"w\"> </span><span class=\"n\">regenera</span><span class=\"o\">=</span><span class=\"nl\">False:</span><span class=\"w\"> </span><span class=\"n\">seguro</span><span class=\"w\">     </span><span class=\"mh\">36</span><span class=\"w\"> </span><span class=\"n\">estados</span><span class=\"w\"> </span><span class=\"n\">alcan\u00e7\u00e1veis</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">tra\u00e7o</span><span class=\"w\"> </span><span class=\"n\">de</span><span class=\"w\"> </span><span class=\"n\">erro</span><span class=\"w\"> </span><span class=\"n\">mais</span><span class=\"w\"> </span><span class=\"nl\">curto:</span><span class=\"w\"> </span><span class=\"n\">None</span>\n<span class=\"n\">N</span><span class=\"o\">=</span><span class=\"mh\">3</span><span class=\"w\"> </span><span class=\"n\">regenera</span><span class=\"o\">=</span><span class=\"n\">True</span><span class=\"w\"> </span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">INSEGURO</span><span class=\"w\">  </span><span class=\"mh\">115</span><span class=\"w\"> </span><span class=\"n\">estados</span><span class=\"w\"> </span><span class=\"n\">alcan\u00e7\u00e1veis</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">tra\u00e7o</span><span class=\"w\"> </span><span class=\"n\">de</span><span class=\"w\"> </span><span class=\"n\">erro</span><span class=\"w\"> </span><span class=\"n\">mais</span><span class=\"w\"> </span><span class=\"nl\">curto:</span><span class=\"w\"> </span><span class=\"mh\">5</span>\n<span class=\"n\">N</span><span class=\"o\">=</span><span class=\"mh\">4</span><span class=\"w\"> </span><span class=\"n\">regenera</span><span class=\"o\">=</span><span class=\"nl\">False:</span><span class=\"w\"> </span><span class=\"n\">seguro</span><span class=\"w\">     </span><span class=\"mh\">96</span><span class=\"w\"> </span><span class=\"n\">estados</span><span class=\"w\"> </span><span class=\"n\">alcan\u00e7\u00e1veis</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">tra\u00e7o</span><span class=\"w\"> </span><span class=\"n\">de</span><span class=\"w\"> </span><span class=\"n\">erro</span><span class=\"w\"> </span><span class=\"n\">mais</span><span class=\"w\"> </span><span class=\"nl\">curto:</span><span class=\"w\"> </span><span class=\"n\">None</span>\n<span class=\"n\">N</span><span class=\"o\">=</span><span class=\"mh\">4</span><span class=\"w\"> </span><span class=\"n\">regenera</span><span class=\"o\">=</span><span class=\"n\">True</span><span class=\"w\"> </span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">INSEGURO</span><span class=\"w\">  </span><span class=\"mh\">591</span><span class=\"w\"> </span><span class=\"n\">estados</span><span class=\"w\"> </span><span class=\"n\">alcan\u00e7\u00e1veis</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">tra\u00e7o</span><span class=\"w\"> </span><span class=\"n\">de</span><span class=\"w\"> </span><span class=\"n\">erro</span><span class=\"w\"> </span><span class=\"n\">mais</span><span class=\"w\"> </span><span class=\"nl\">curto:</span><span class=\"w\"> </span><span class=\"mh\">5</span>\n</code></pre></div>\n<span class=\"paragraph\"><strong>Tra\u00e7o de erro com BMC</strong> (<marimo-tex class=\"arithmatex\">||(N=3||)</marimo-tex>, com regenera\u00e7\u00e3o):</span>\n<div class=\"language-verilog codehilite\"><pre><span></span><code><span class=\"n\">W</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"err\">\u00e0</span><span class=\"w\"> </span><span class=\"n\">espera</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">C</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">sec\u00e7\u00e3o</span><span class=\"w\"> </span><span class=\"n\">cr\u00edtica</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">T</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">testemunho</span>\n<span class=\"w\"> </span><span class=\"mh\">0</span><span class=\"w\">  </span><span class=\"n\">in\u00edcio</span><span class=\"w\">         </span><span class=\"nl\">p0:</span><span class=\"p\">..</span><span class=\"n\">T</span><span class=\"w\">  </span><span class=\"nl\">p1:</span><span class=\"p\">...</span><span class=\"w\">  </span><span class=\"nl\">p2:</span><span class=\"p\">...</span>\n<span class=\"w\"> </span><span class=\"mh\">1</span><span class=\"w\">  </span><span class=\"n\">pedir</span><span class=\"p\">(</span><span class=\"n\">p1</span><span class=\"p\">)</span><span class=\"w\">      </span><span class=\"nl\">p0:</span><span class=\"p\">..</span><span class=\"n\">T</span><span class=\"w\">  </span><span class=\"nl\">p1:</span><span class=\"n\">W</span><span class=\"p\">..</span><span class=\"w\">  </span><span class=\"nl\">p2:</span><span class=\"p\">...</span>\n<span class=\"w\"> </span><span class=\"mh\">2</span><span class=\"w\">  </span><span class=\"n\">regenerar</span><span class=\"p\">(</span><span class=\"n\">p1</span><span class=\"p\">)</span><span class=\"w\">  </span><span class=\"nl\">p0:</span><span class=\"p\">..</span><span class=\"n\">T</span><span class=\"w\">  </span><span class=\"nl\">p1:</span><span class=\"n\">W</span><span class=\"p\">.</span><span class=\"n\">T</span><span class=\"w\">  </span><span class=\"nl\">p2:</span><span class=\"p\">...</span>\n<span class=\"w\"> </span><span class=\"mh\">3</span><span class=\"w\">  </span><span class=\"n\">entrar</span><span class=\"p\">(</span><span class=\"n\">p1</span><span class=\"p\">)</span><span class=\"w\">     </span><span class=\"nl\">p0:</span><span class=\"p\">..</span><span class=\"n\">T</span><span class=\"w\">  </span><span class=\"nl\">p1:</span><span class=\"p\">.</span><span class=\"n\">CT</span><span class=\"w\">  </span><span class=\"nl\">p2:</span><span class=\"p\">...</span>\n<span class=\"w\"> </span><span class=\"mh\">4</span><span class=\"w\">  </span><span class=\"n\">pedir</span><span class=\"p\">(</span><span class=\"n\">p0</span><span class=\"p\">)</span><span class=\"w\">      </span><span class=\"nl\">p0:</span><span class=\"n\">W</span><span class=\"p\">.</span><span class=\"n\">T</span><span class=\"w\">  </span><span class=\"nl\">p1:</span><span class=\"p\">.</span><span class=\"n\">CT</span><span class=\"w\">  </span><span class=\"nl\">p2:</span><span class=\"p\">...</span>\n<span class=\"w\"> </span><span class=\"mh\">5</span><span class=\"w\">  </span><span class=\"n\">entrar</span><span class=\"p\">(</span><span class=\"n\">p0</span><span class=\"p\">)</span><span class=\"w\">     </span><span class=\"nl\">p0:</span><span class=\"p\">.</span><span class=\"n\">CT</span><span class=\"w\">  </span><span class=\"nl\">p1:</span><span class=\"p\">.</span><span class=\"n\">CT</span><span class=\"w\">  </span><span class=\"nl\">p2:</span><span class=\"p\">...</span>\n</code></pre></div></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "iLit",
+      "code_hash": "08e8f1123ed262fd393cfa497814f660",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"o-que-foi-feito-e-o-que-se-observa\">O que foi feito e o que se observa</h3>\n<span class=\"paragraph\">Para <marimo-tex class=\"arithmatex\">||(N=2,3,4||)</marimo-tex>, com e sem a regra <em>regenerar</em>, compara-se o BMC com a pesquisa em largura:\nt\u00eam de concordar sobre se h\u00e1 erro <strong>e</strong> sobre o comprimento do tra\u00e7o mais curto, e o\ntra\u00e7o devolvido tem de ser um tra\u00e7o v\u00e1lido (<code>e_traco</code>). As asser\u00e7\u00f5es do c\u00f3digo garantem-no.</span>\n<span class=\"paragraph\">Sem regenera\u00e7\u00e3o o sistema \u00e9 <strong>seguro</strong>: o BMC n\u00e3o encontra erro. Com regenera\u00e7\u00e3o \u00e9\n<strong>inseguro</strong>, com um tra\u00e7o de 5 passos. O tra\u00e7o mostra o mecanismo: um processo pede e,\ncomo est\u00e1 \u00e0 espera sem testemunho, <strong>regenera</strong> um testemunho novo e entra em <code>C</code>;\nentretanto o processo que tinha o testemunho original pede e entra tamb\u00e9m, e ficam dois\nem <code>C</code>. O tra\u00e7o concreto pode variar com o modelo que o Z3 devolve, mas tem sempre\n5 passos, como confirma a pesquisa em largura.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ZHCJ",
+      "code_hash": "67a51073ab558dfefd4812fdaa067007",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ROlb",
+      "code_hash": "5c97126bc1a310ba617cf47466be0c12",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"o-que-foi-feito-alinea-3-carregar-o-pdr\">O que foi feito (al\u00ednea 3, carregar o PDR)</h3>\n<span class=\"paragraph\">Importa-se o <code>pdr_lia.py</code> (que tem de estar na mesma pasta que este notebook) <strong>sem o\nreimplementar</strong>. Dele usam-se a classe <code>PDR</code>, a verifica\u00e7\u00e3o <code>e_modelo</code> e a fun\u00e7\u00e3o\n<code>spacer</code>, que entrega as mesmas CHCs ao Spacer. A classe <code>CFA</code> n\u00e3o \u00e9 exportada pelo\n<code>pdr_lia</code>, mas obt\u00e9m-se como o tipo de qualquer um dos seus exemplos.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "qnkX",
+      "code_hash": "c2bb788d49ac27634b9e414d125f1877",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "TqIu",
+      "code_hash": "8187f734b07b5116ebafff153379143f",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"o-que-foi-feito-alinea-3-traducao-para-o-pdr\">O que foi feito (al\u00ednea 3, tradu\u00e7\u00e3o para o PDR)</h3>\n<span class=\"paragraph\">O PDR de <code>pdr_lia.py</code> s\u00f3 aceita <strong>vari\u00e1veis inteiras</strong> e <strong>CFAs</strong>, por isso:</span>\n<ul>\n<li><strong>Booleano \u2192 inteiro em <marimo-tex class=\"arithmatex\">||(\\{0,1\\}||)</marimo-tex>.</strong> <code>Anel(N, inteiro=True)</code> escreve as mesmas\n  regras com <code>v == 1</code> e <code>v == 0</code>. A restri\u00e7\u00e3o de dom\u00ednio <marimo-tex class=\"arithmatex\">||(0\\le v\\le 1||)</marimo-tex> est\u00e1 na rela\u00e7\u00e3o\n  <marimo-tex class=\"arithmatex\">||(\\tau||)</marimo-tex> de <strong>todos</strong> os ramos, para o PDR nunca considerar valores fora de <marimo-tex class=\"arithmatex\">||(\\{0,1\\}||)</marimo-tex>.</li>\n<li><strong>CFA com um local de trabalho.</strong> <code>system \u2192 do</code> tem como rela\u00e7\u00e3o <marimo-tex class=\"arithmatex\">||(\\mathsf{I}(\\mathsf{X}')||)</marimo-tex>;\n  <code>do \u2192 do</code> tem <marimo-tex class=\"arithmatex\">||(\\mathsf{T}(\\mathsf{X},\\mathsf{X}')||)</marimo-tex>; <code>do \u2192 error</code> tem a guarda <marimo-tex class=\"arithmatex\">||(\\mathsf{E}(\\mathsf{X})||)</marimo-tex> com\n  <marimo-tex class=\"arithmatex\">||(\\mathsf{X}'=\\mathsf{X}||)</marimo-tex>. As CHCs s\u00e3o ent\u00e3o: <marimo-tex class=\"arithmatex\">||(P_{\\mathsf{system}}||)</marimo-tex> vale sempre, <marimo-tex class=\"arithmatex\">||(P_{do}||)</marimo-tex> cont\u00e9m <marimo-tex class=\"arithmatex\">||(\\mathsf{I}||)</marimo-tex> e \u00e9\n  fechado por <marimo-tex class=\"arithmatex\">||(\\mathsf{T}||)</marimo-tex>, e <marimo-tex class=\"arithmatex\">||(P_{\\mathsf{error}}||)</marimo-tex> tem de ser falso.</li>\n<li><code>corre_pdr</code> corre o algoritmo e normaliza o resultado: <code>sat</code>\u2192<code>safe</code> (existe invariante),\n  <code>unsat</code>\u2192<code>unsafe</code> (caminho at\u00e9 <code>error</code>), sen\u00e3o <code>unknown</code>.</li>\n<li><code>inv_de_inteiros</code> converte o invariante de <marimo-tex class=\"arithmatex\">||(P_{do}||)</marimo-tex> (sobre inteiros) para booleanos,\n  para o poder verificar com <code>e_invariante</code>.</li>\n</ul></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Vxnm",
+      "code_hash": "69c74ea70c91762c99ef3dd259d2b22e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "DnEU",
+      "code_hash": "b9bb6e9678208fc1ad0e37898a0823e6",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"o-que-foi-feito-alinea-3-interpolantes-e-invariantes\">O que foi feito (al\u00ednea 3, interpolantes e invariantes)</h3>\n<span class=\"paragraph\">O reposit\u00f3rio LC n\u00e3o traz o algoritmo de interpolantes nem a fun\u00e7\u00e3o <code>interpolate</code>, por\nisso foram escritos aqui.</span>\n<ul>\n<li><strong><code>interpolate(A, B, comuns)</code></strong> calcula o interpolante <strong>via CHCs</strong>: pede ao Spacer um\n  predicado <code>Itp</code> sobre as vari\u00e1veis comuns tal que <marimo-tex class=\"arithmatex\">||(A\\to \\mathit{Itp}||)</marimo-tex> e\n  <marimo-tex class=\"arithmatex\">||(\\mathit{Itp}\\land B\\to\\mathtt{False}||)</marimo-tex>. O modelo do Spacer \u00e9 o interpolante. Se o resultado\n  tiver quantificadores, eliminam-se com <code>Tactic('qe')</code> (o dom\u00ednio \u00e9 finito). Se\n  <marimo-tex class=\"arithmatex\">||(A\\land B||)</marimo-tex> for satisfaz\u00edvel n\u00e3o h\u00e1 interpolante e devolve <code>None</code>.</li>\n<li><strong><code>itp_mc(S)</code></strong> \u00e9 o algoritmo de interpolantes e invariantes. Para cada janela de erro\n  <marimo-tex class=\"arithmatex\">||(m||)</marimo-tex>, come\u00e7a com <marimo-tex class=\"arithmatex\">||(R=\\mathsf{I}||)</marimo-tex> e calcula o interpolante de\n  <marimo-tex class=\"arithmatex\">||(A=R\\land\\mathsf{T}||)</marimo-tex> contra <marimo-tex class=\"arithmatex\">||(B=||)</marimo-tex> \"erro em <marimo-tex class=\"arithmatex\">||(\\le m||)</marimo-tex> passos\". O interpolante sobre-aproxima o\n  que se alcan\u00e7a em um passo a partir de <marimo-tex class=\"arithmatex\">||(R||)</marimo-tex> sem chegar a erro.<ul>\n<li>se <strong>implica <marimo-tex class=\"arithmatex\">||(R||)</marimo-tex></strong>, ent\u00e3o <marimo-tex class=\"arithmatex\">||(R||)</marimo-tex> \u00e9 fechado por <marimo-tex class=\"arithmatex\">||(\\mathsf{T}||)</marimo-tex> e \u00e9 o <strong>invariante indutivo</strong> (<code>safe</code>);</li>\n<li>sen\u00e3o faz-se <marimo-tex class=\"arithmatex\">||(R := R\\lor I_1||)</marimo-tex> (<strong>rotina do majorante</strong>) e repete-se;</li>\n<li>se <marimo-tex class=\"arithmatex\">||(A\\land B||)</marimo-tex> \u00e9 satisfaz\u00edvel com <marimo-tex class=\"arithmatex\">||(R=\\mathsf{I}||)</marimo-tex>, o erro \u00e9 real (<code>unsafe</code>); com <marimo-tex class=\"arithmatex\">||(R\\neq\\mathsf{I}||)</marimo-tex> \u00e9 um\n  falso alarme e aumenta-se <marimo-tex class=\"arithmatex\">||(m||)</marimo-tex>.</li>\n</ul>\n</li>\n<li>O par <strong><marimo-tex class=\"arithmatex\">||((n,m)||)</marimo-tex></strong> devolvido \u00e9: <marimo-tex class=\"arithmatex\">||(n||)</marimo-tex> = n\u00famero de majorantes acumulados em <marimo-tex class=\"arithmatex\">||(R||)</marimo-tex> e <marimo-tex class=\"arithmatex\">||(m||)</marimo-tex> = janela de\n  erro em que se decidiu (<marimo-tex class=\"arithmatex\">||(n=0||)</marimo-tex> \u00e9 um contra-exemplo genu\u00edno a partir de <marimo-tex class=\"arithmatex\">||(\\mathsf{I}||)</marimo-tex>).</li>\n<li>O n\u00famero de <strong>itera\u00e7\u00f5es</strong> \u00e9 o total de interpolantes calculados, e a dimens\u00e3o do invariante\n  \u00e9 medida com <code>tamanho</code>.</li>\n</ul>\n<span class=\"paragraph\">O limite de itera\u00e7\u00f5es (<code>max_iter</code>) e o de janelas (<code>m_max</code>) ficam ao crit\u00e9rio do grupo.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ulZA",
+      "code_hash": "5d82ebbacbd7a2d987e0201f4766f383",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\"><strong>PDR (N=3):</strong> safe, 8 frames, 158 obriga\u00e7\u00f5es, 70.14 s</span>\n<span class=\"paragraph\">Invariante do PDR em <code>do</code> (dimens\u00e3o 339 n\u00f3s):\n<div class=\"language-text codehilite\"><pre><span></span><code>And(Not(Or(And(c0 == 1, c1 == 1),\n           And(c0 == 1, c2 == 1),\n           And(c1 == 1, c2 == 1))),\n    Not(Or(And(w2 == 1, t2 == 1, w0 == 0, c0 == 1),\n           And(w0 == 1, t0 == 1, w2 == 0, c2 == 1),\n           And(c1 == 1,\n               c1 == 0,\n               t1 == 0,\n               t2 == 1,\n               w0 == 0,\n               w2 == 0,\n               c0 == 1,\n               c2 == 1),\n           And(w1 == 1,\n               t1 == 1,\n               w1 == 0,\n               c1 == 1,\n\n... (cortado; 5828 caracteres)\n</code></pre></div>\n<code>e_modelo</code>: True   <code>e_invariante</code>: (True, {'I \u2227 \u00acinv': True, \"inv \u2227 T \u2227 \u00acinv'\": True, 'inv \u2227 E': True})</span>\n<span class=\"paragraph\"><strong>Interpolantes (N=3):</strong> safe, (n,m)=(6, 0), 7 interpolantes, 2.02 s</span>\n<span class=\"paragraph\">Invariante (dimens\u00e3o 240 n\u00f3s):\n<div class=\"language-scdoc codehilite\"><pre><span></span><code>Or(And(w1_0,\n       Not(c0_0),\n       t1_0,\n       Not(c1_0),\n       Not(w2_0),\n       w0_0,\n       Not(t0_0),\n       Not(t2_0),\n       Not(c2_0)),\n   And(t0_0,\n       Not(t2_0),\n       Not(c0_0),\n       Not(t1_0),\n       Not(c1_0),\n       Not(w2_0),\n       Not(w1_0),\n       w0_0,\n       Not(c2_0)),\n   And(c1_0,\n       Not(w1_0),\n       Not(c2_0),\n       t1_0,\n       Not(c0_0),\n       Not(t2_0),\n       Not(w2_0),\n       Not(w0_0),\n       Not(t0_0)),\n   And(w0_0,\n       Not(c0_0),\n       t1_0,\n\n<span class=\"k\">...</span> (cortado; 3315 caracteres)\n</code></pre></div>\n<code>e_invariante</code>: (True, {'I \u2227 \u00acinv': True, \"inv \u2227 T \u2227 \u00acinv'\": True, 'inv \u2227 E': True})</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ecfG",
+      "code_hash": "fc32fe579feaff1e856edd8fd5b1196a",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"o-que-foi-feito-e-o-que-se-observa-alinea-3-execucao\">O que foi feito e o que se observa (al\u00ednea 3, execu\u00e7\u00e3o)</h3>\n<span class=\"paragraph\">Para <marimo-tex class=\"arithmatex\">||(N=3||)</marimo-tex> corre-se o PDR e o algoritmo de interpolantes sobre o sistema seguro, mostra-se o\ninvariante que cada um encontrou e <strong>verifica-se de forma independente</strong>:</span>\n<ul>\n<li><code>e_modelo</code> (de <code>pdr_lia.py</code>) confirma que o resultado do PDR \u00e9 um modelo das CHCs;</li>\n<li><code>e_invariante</code> faz os tr\u00eas testes de insatisfazibilidade sobre o SFOTS booleano. Deve dar\n  <code>True</code> nos tr\u00eas.</li>\n</ul>\n<span class=\"paragraph\">Os invariantes obtidos pelos algoritmos s\u00e3o tipicamente mais <strong>complicados</strong> que o argumento\ninformal (\"h\u00e1 um s\u00f3 testemunho\"): s\u00e3o conjun\u00e7\u00f5es de lemas, ou uma disjun\u00e7\u00e3o de\ninterpolantes. Mas todos t\u00eam de implicar a exclus\u00e3o m\u00fatua, e \u00e9 isso que se verificou.\nSe o PDR der <code>unknown</code>, atingiu os limites de passos (ver a nota t\u00e9cnica de escala do enunciado).</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Pvdt",
+      "code_hash": "193a15e39b69a5b572074f9d261c2749",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\"><strong>Refer\u00eancia (BFS), N=3, com regenera\u00e7\u00e3o:</strong> INSEGURO</span>\n<span class=\"paragraph\"><strong>PDR:</strong> unsafe, caminho <code>system \u2192 do \u2192 do \u2192 do \u2192 do \u2192 do \u2192 do \u2192 error</code></span>\n<span class=\"paragraph\"><strong>Interpolantes:</strong> unsafe, (n,m)=(0, 4)</span>\n<span class=\"paragraph\"><strong>BMC:</strong> tra\u00e7o de erro com 5 passos (ver acima)</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ZBYS",
+      "code_hash": "968d7a27260f705298e2b3b22e2a65b9",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"o-que-foi-feito-e-o-que-se-observa-alinea-4\">O que foi feito e o que se observa (al\u00ednea 4)</h3>\n<span class=\"paragraph\">Repete-se a verifica\u00e7\u00e3o com <code>regenera=True</code>. Os <strong>dois algoritmos devem detetar a\ninseguran\u00e7a</strong>: o PDR devolve um caminho at\u00e9 <code>error</code> e o algoritmo de interpolantes devolve\n<code>unsafe</code> com o par <marimo-tex class=\"arithmatex\">||((n,m)||)</marimo-tex> em que o encontrou. O tra\u00e7o de erro concreto, passo a passo,\n\u00e9 o do BMC (c\u00e9lula anterior).</span>\n<span class=\"paragraph\">A regra <em>regenerar</em> quebra a invariante \"h\u00e1 exatamente um testemunho\": um processo \u00e0 espera\ne sem testemunho cria um testemunho novo, e passa a ser poss\u00edvel haver dois processos em\n<code>C</code> ao mesmo tempo.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "aLJB",
+      "code_hash": "0e49f23f22ade6fd8611c532b9242702",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "nHfw",
+      "code_hash": "0e595827616423b6e302fce58b5e52ca",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"o-que-foi-feito-alinea-5-funcao-de-avaliacao\">O que foi feito (al\u00ednea 5, fun\u00e7\u00e3o de avalia\u00e7\u00e3o)</h3>\n<span class=\"paragraph\"><code>avalia(N, regenera)</code> corre os tr\u00eas algoritmos para um <marimo-tex class=\"arithmatex\">||(N||)</marimo-tex> e uma variante e devolve <strong>uma linha\nda tabela</strong> com, para cada um:</span>\n<ul>\n<li>o <strong>resultado</strong> (<code>safe</code>, <code>unsafe</code> ou <code>unknown</code>);</li>\n<li>o <strong>tempo</strong>;</li>\n<li>o n\u00famero de <strong>itera\u00e7\u00f5es</strong> (frames e obriga\u00e7\u00f5es no PDR; o par <marimo-tex class=\"arithmatex\">||((n,m)||)</marimo-tex> e o n\u00famero de\n  interpolantes no algoritmo de interpolantes; o Spacer n\u00e3o exp\u00f5e itera\u00e7\u00f5es);</li>\n<li>a <strong>dimens\u00e3o do invariante</strong> (n\u00f3s da f\u00f3rmula).</li>\n</ul>\n<span class=\"paragraph\">Compara ainda cada resultado com a pesquisa em largura (coluna <code>acordo</code>) e verifica <strong>todos os\ninvariantes devolvidos</strong> com <code>e_modelo</code> ou <code>e_invariante</code> (coluna <code>invariantes ok</code>).</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "xXTn",
+      "code_hash": "540ec9209411083b9c043ad0305f6f7c",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\"><strong>Resultados</strong></span>\n<table>\n<thead>\n<tr>\n<th>N</th>\n<th>variante</th>\n<th>refer\u00eancia</th>\n<th>PDR</th>\n<th>ITP</th>\n<th>Spacer</th>\n<th>acordo</th>\n<th>invariantes ok</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>2</td>\n<td>normal</td>\n<td>safe</td>\n<td>safe</td>\n<td>safe</td>\n<td>safe</td>\n<td>True</td>\n<td>True</td>\n</tr>\n<tr>\n<td>2</td>\n<td>regenera</td>\n<td>unsafe</td>\n<td>unsafe</td>\n<td>unsafe</td>\n<td>unsafe</td>\n<td>True</td>\n<td>True</td>\n</tr>\n<tr>\n<td>3</td>\n<td>normal</td>\n<td>safe</td>\n<td>safe</td>\n<td>safe</td>\n<td>safe</td>\n<td>True</td>\n<td>True</td>\n</tr>\n<tr>\n<td>3</td>\n<td>regenera</td>\n<td>unsafe</td>\n<td>unsafe</td>\n<td>unsafe</td>\n<td>unsafe</td>\n<td>True</td>\n<td>True</td>\n</tr>\n<tr>\n<td>4</td>\n<td>normal</td>\n<td>safe</td>\n<td>safe</td>\n<td>safe</td>\n<td>safe</td>\n<td>True</td>\n<td>True</td>\n</tr>\n<tr>\n<td>4</td>\n<td>regenera</td>\n<td>unsafe</td>\n<td>unsafe</td>\n<td>unsafe</td>\n<td>unsafe</td>\n<td>True</td>\n<td>True</td>\n</tr>\n</tbody>\n</table>\n<span class=\"paragraph\"><strong>Tempos (s)</strong></span>\n<table>\n<thead>\n<tr>\n<th>N</th>\n<th>variante</th>\n<th>PDR s</th>\n<th>ITP s</th>\n<th>Spacer s</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>2</td>\n<td>normal</td>\n<td>15.72</td>\n<td>0.47</td>\n<td>0.08</td>\n</tr>\n<tr>\n<td>2</td>\n<td>regenera</td>\n<td>16.84</td>\n<td>1.33</td>\n<td>0.14</td>\n</tr>\n<tr>\n<td>3</td>\n<td>normal</td>\n<td>90.14</td>\n<td>2.02</td>\n<td>0.48</td>\n</tr>\n<tr>\n<td>3</td>\n<td>regenera</td>\n<td>43.84</td>\n<td>2.78</td>\n<td>0.49</td>\n</tr>\n<tr>\n<td>4</td>\n<td>normal</td>\n<td>182.22</td>\n<td>12.2</td>\n<td>0.63</td>\n</tr>\n<tr>\n<td>4</td>\n<td>regenera</td>\n<td>101.55</td>\n<td>4.97</td>\n<td>1.39</td>\n</tr>\n</tbody>\n</table>\n<span class=\"paragraph\"><strong>Itera\u00e7\u00f5es e dimens\u00e3o do invariante</strong></span>\n<table>\n<thead>\n<tr>\n<th>N</th>\n<th>variante</th>\n<th>PDR iter</th>\n<th>PDR dim</th>\n<th>ITP iter</th>\n<th>ITP dim</th>\n<th>Spacer dim</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>2</td>\n<td>normal</td>\n<td>6 frames / 52 obrig.</td>\n<td>88</td>\n<td>(n,m)=(4, 0) / 5 itp.</td>\n<td>65</td>\n<td>20</td>\n</tr>\n<tr>\n<td>2</td>\n<td>regenera</td>\n<td>7 frames / 64 obrig.</td>\n<td>\u2014</td>\n<td>(n,m)=(0, 4) / 10 itp.</td>\n<td>\u2014</td>\n<td>\u2014</td>\n</tr>\n<tr>\n<td>3</td>\n<td>normal</td>\n<td>8 frames / 190 obrig.</td>\n<td>426</td>\n<td>(n,m)=(6, 0) / 7 itp.</td>\n<td>240</td>\n<td>34</td>\n</tr>\n<tr>\n<td>3</td>\n<td>regenera</td>\n<td>7 frames / 112 obrig.</td>\n<td>\u2014</td>\n<td>(n,m)=(0, 4) / 10 itp.</td>\n<td>\u2014</td>\n<td>\u2014</td>\n</tr>\n<tr>\n<td>4</td>\n<td>normal</td>\n<td>9 frames / 265 obrig.</td>\n<td>628</td>\n<td>(n,m)=(8, 0) / 9 itp.</td>\n<td>898</td>\n<td>52</td>\n</tr>\n<tr>\n<td>4</td>\n<td>regenera</td>\n<td>7 frames / 172 obrig.</td>\n<td>\u2014</td>\n<td>(n,m)=(0, 4) / 10 itp.</td>\n<td>\u2014</td>\n<td>\u2014</td>\n</tr>\n</tbody>\n</table></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "AjVT",
+      "code_hash": "80baa795c5a4537b9bff1960c2ca4219",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"o-que-se-observa-alinea-5-tabela\">O que se observa (al\u00ednea 5, tabela)</h3>\n<span class=\"paragraph\">A tabela cobre <marimo-tex class=\"arithmatex\">||(N=2,\\dots,||)</marimo-tex><code>N_MAX</code>, na vers\u00e3o segura (<code>normal</code>) e na variante com <code>regenera</code>.\nAs duas asser\u00e7\u00f5es do c\u00f3digo garantem que:</span>\n<ul>\n<li><strong>os tr\u00eas algoritmos concordam entre si e com a pesquisa em largura</strong> em todos os casos\n  em que deram resposta (<code>unknown</code> n\u00e3o conta);</li>\n<li><strong>todo o invariante devolvido passou na verifica\u00e7\u00e3o independente.</strong></li>\n</ul>\n<span class=\"paragraph\">Pontos a comentar no relat\u00f3rio depois de ver os n\u00fameros:</span>\n<ul>\n<li>o tempo do PDR did\u00e1tico cresce depressa com <marimo-tex class=\"arithmatex\">||(N||)</marimo-tex>, e \u00e9 a\u00ed que fica o limite da compara\u00e7\u00e3o\n  (o enunciado avisa que isto acontece a partir de <marimo-tex class=\"arithmatex\">||(N=5||)</marimo-tex>);</li>\n<li>o Spacer costuma ser muito mais r\u00e1pido que o PDR did\u00e1tico, por usar interpola\u00e7\u00e3o e\n  heur\u00edsticas globais;</li>\n<li>a dimens\u00e3o do invariante cresce com <marimo-tex class=\"arithmatex\">||(N||)</marimo-tex>; o invariante \"\u00e0 m\u00e3o\" (b\u00f3nus) tem tamanho linear\n  em <marimo-tex class=\"arithmatex\">||(N||)</marimo-tex>, e conv\u00e9m compar\u00e1-lo com os dos algoritmos;</li>\n<li>nas variantes inseguras n\u00e3o h\u00e1 invariante: a coluna de dimens\u00e3o fica vazia e o que conta \u00e9 o\n  tempo at\u00e9 ao contra-exemplo.</li>\n</ul></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "pHFh",
+      "code_hash": "99e05d93506b8a0bd537fe9ae0457248",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><div class=\"language-gdscript codehilite\"><pre><span></span><code><span class=\"n\">N</span><span class=\"o\">=</span><span class=\"mi\">2</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">invariante</span><span class=\"w\"> </span><span class=\"n\">manual</span><span class=\"w\"> </span><span class=\"n\">indutivo</span><span class=\"w\"> </span><span class=\"n\">e</span><span class=\"w\"> </span><span class=\"n\">seguro</span><span class=\"err\">?</span><span class=\"w\"> </span><span class=\"n\">True</span><span class=\"w\">  </span><span class=\"p\">{</span><span class=\"s1\">&#39;I \u2227 \u00acinv&#39;</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">True</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"s2\">&quot;inv \u2227 T \u2227 \u00acinv&#39;&quot;</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">True</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"s1\">&#39;inv \u2227 E&#39;</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">True</span><span class=\"p\">}</span>\n<span class=\"n\">N</span><span class=\"o\">=</span><span class=\"mi\">3</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">invariante</span><span class=\"w\"> </span><span class=\"n\">manual</span><span class=\"w\"> </span><span class=\"n\">indutivo</span><span class=\"w\"> </span><span class=\"n\">e</span><span class=\"w\"> </span><span class=\"n\">seguro</span><span class=\"err\">?</span><span class=\"w\"> </span><span class=\"n\">True</span><span class=\"w\">  </span><span class=\"p\">{</span><span class=\"s1\">&#39;I \u2227 \u00acinv&#39;</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">True</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"s2\">&quot;inv \u2227 T \u2227 \u00acinv&#39;&quot;</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">True</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"s1\">&#39;inv \u2227 E&#39;</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">True</span><span class=\"p\">}</span>\n<span class=\"n\">N</span><span class=\"o\">=</span><span class=\"mi\">4</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">invariante</span><span class=\"w\"> </span><span class=\"n\">manual</span><span class=\"w\"> </span><span class=\"n\">indutivo</span><span class=\"w\"> </span><span class=\"n\">e</span><span class=\"w\"> </span><span class=\"n\">seguro</span><span class=\"err\">?</span><span class=\"w\"> </span><span class=\"n\">True</span><span class=\"w\">  </span><span class=\"p\">{</span><span class=\"s1\">&#39;I \u2227 \u00acinv&#39;</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">True</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"s2\">&quot;inv \u2227 T \u2227 \u00acinv&#39;&quot;</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">True</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"s1\">&#39;inv \u2227 E&#39;</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">True</span><span class=\"p\">}</span>\n<span class=\"n\">N</span><span class=\"o\">=</span><span class=\"mi\">5</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">invariante</span><span class=\"w\"> </span><span class=\"n\">manual</span><span class=\"w\"> </span><span class=\"n\">indutivo</span><span class=\"w\"> </span><span class=\"n\">e</span><span class=\"w\"> </span><span class=\"n\">seguro</span><span class=\"err\">?</span><span class=\"w\"> </span><span class=\"n\">True</span><span class=\"w\">  </span><span class=\"p\">{</span><span class=\"s1\">&#39;I \u2227 \u00acinv&#39;</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">True</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"s2\">&quot;inv \u2227 T \u2227 \u00acinv&#39;&quot;</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">True</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"s1\">&#39;inv \u2227 E&#39;</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">True</span><span class=\"p\">}</span>\n<span class=\"n\">k</span><span class=\"o\">-</span><span class=\"n\">indu\u00e7\u00e3o</span><span class=\"w\"> </span><span class=\"n\">refor\u00e7ada</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">N</span><span class=\"o\">=</span><span class=\"mi\">4</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">k</span><span class=\"o\">=</span><span class=\"mi\">1</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">base</span><span class=\"o\">=</span><span class=\"n\">True</span><span class=\"w\"> </span><span class=\"n\">passo</span><span class=\"o\">=</span><span class=\"n\">True</span>\n<span class=\"n\">k</span><span class=\"o\">-</span><span class=\"n\">indu\u00e7\u00e3o</span><span class=\"w\"> </span><span class=\"n\">refor\u00e7ada</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">N</span><span class=\"o\">=</span><span class=\"mi\">4</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">k</span><span class=\"o\">=</span><span class=\"mi\">2</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"n\">base</span><span class=\"o\">=</span><span class=\"n\">True</span><span class=\"w\"> </span><span class=\"n\">passo</span><span class=\"o\">=</span><span class=\"n\">True</span>\n</code></pre></div></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "NCOB",
+      "code_hash": "193ba0e23f597c087858bc0077d10f21",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"bonus-invariante-a-mao-e-k-inducao-reforcada\">B\u00f3nus: invariante \u00e0 m\u00e3o e <marimo-tex class=\"arithmatex\">||(k||)</marimo-tex>-indu\u00e7\u00e3o refor\u00e7ada</h3>\n<span class=\"paragraph\">O argumento informal do enunciado (\"s\u00f3 h\u00e1 um testemunho, e quem est\u00e1 na sec\u00e7\u00e3o cr\u00edtica tem-no\")\nescreve-se como o invariante</span>\n<marimo-tex class=\"arithmatex\">||[\\mathsf{inv}\\;\\equiv\\;\\Big(\\sum_i t_i = 1\\Big)\\;\\land\\;\\bigwedge_i (c_i\\to t_i).||]</marimo-tex><ul>\n<li><strong>\u00c9 indutivo.</strong> <code>sair</code> e <code>passar</code> movem o \u00fanico testemunho; quem o recebe n\u00e3o estava na\n  sec\u00e7\u00e3o cr\u00edtica (porque <marimo-tex class=\"arithmatex\">||(c_j\\to t_j||)</marimo-tex> e <marimo-tex class=\"arithmatex\">||(t_j||)</marimo-tex> era falso), e <code>entrar</code> s\u00f3 acontece com o\n  testemunho. <code>e_invariante</code> confirma-o para v\u00e1rios <marimo-tex class=\"arithmatex\">||(N||)</marimo-tex>.</li>\n<li><strong>Exclui o erro.</strong> Dois processos em <code>C</code> teriam dois testemunhos, o que contradiz\n  <marimo-tex class=\"arithmatex\">||(\\sum_i t_i=1||)</marimo-tex>.</li>\n<li><strong>A <marimo-tex class=\"arithmatex\">||(k||)</marimo-tex>-indu\u00e7\u00e3o passa a funcionar</strong> com <marimo-tex class=\"arithmatex\">||(k=1||)</marimo-tex> quando se refor\u00e7a a propriedade com <code>inv</code>,\n  porque os contra-exemplos da al\u00ednea 2 (estados com dois testemunhos, ou com um processo em\n  <code>C</code> sem testemunho) deixam de ser estados poss\u00edveis.</li>\n</ul>\n<span class=\"paragraph\">Compara-se este invariante, pequeno e leg\u00edvel, com os que o PDR e os interpolantes encontram\nna tabela da al\u00ednea 5.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    }
+  ]
+}
